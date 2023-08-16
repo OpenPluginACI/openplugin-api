@@ -1,0 +1,16 @@
+.env
+cached
+env
+err.log
+__pycache__
+.pytest_cache
+
+# ignore pip build directories
+**.egg**
+**dist
+**build
+
+**/logs
+EnvOpenPluginApi
+
+tmp

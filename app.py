@@ -8,7 +8,7 @@ from collections import deque
 from typing import Dict, List, TypedDict
 from openplugincore import openplugin_completion, OpenPluginMemo
 from datetime import datetime
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 from openai import ChatCompletion
 
 
@@ -206,8 +206,62 @@ def evaluate_tentative():
         error_message = str(e)
         return jsonify({"error": f"{error_class} error: {error_message}"}), 500
     
+@app.route('/eval/supported', methods=['GET'])
+def evaluate_supported():
+    authorization = request.headers.get('authorization')
+    if authorization != os.getenv('AUTHORIZATION_SECRET'):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    headers = {'authorization': authorization}
+    
+    try:
+        # Retrieve the plugin_name, root_url, and prompt from the request parameters
+        plugin_name = request.args.get('plugin_name')
+        root_url = request.args.get('root_url')
+        prompt = request.args.get('prompt')
+        if root_url:
+            root_url = unquote(root_url)
+        if prompt:
+            prompt = unquote(prompt)
+
+        # Ensure that either plugin_name or root_url is provided
+        if not plugin_name and not root_url:
+            return jsonify({"error": "Either plugin_name or root_url must be provided"}), 400
+
+        # If no prompt is provided, get one from the /generate_prompt endpoint
+        if not prompt:
+            with app.test_client() as client:
+                if plugin_name:
+                    response = client.get(f'/generate_prompt?plugin_name={plugin_name}', headers=headers)
+                else:
+                    response = client.get(f'/generate_prompt?root_url={quote(root_url)}', headers=headers)
+                if response.status_code == 200:
+                    prompt = response.json.get('stimulous_prompt')
+                    print("generated prompt: ", prompt)
+                else:
+                    return jsonify(response.json), response.status_code
+
+        # Transform the prompt into a message and send it to the /plugin endpoint
+        data = {
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        if plugin_name:
+            data["openplugin_namespace"] = plugin_name
+        else:
+            data["openplugin_root_url"] = root_url
+
+        with app.test_client() as client:
+            response = client.post('/plugin', json=data, headers=headers)
+            return jsonify(response.json), response.status_code
+
+    except Exception as e:
+        error_class = type(e).__name__
+        error_message = str(e)
+        return jsonify({"error": f"{error_class} error: {error_message}"}), 500
+    
 @app.route('/generate_prompt', methods=['GET'])
 def generate_prompt():
+    print("GENERATE PROMPT")
     authorization = request.headers.get('authorization')
     if authorization != os.getenv('AUTHORIZATION_SECRET'):
         return jsonify({"error": "Unauthorized"}), 401 
@@ -225,10 +279,13 @@ def generate_prompt():
 
         # Initialize the plugin
         plugin = None
-        if plugin_name:
-            plugin = open_plugin_memo.get_plugin(plugin_name)
-        elif root_url:
-            plugin = open_plugin_memo.init_openplugin(root_url=root_url)
+        try:
+            if plugin_name:
+                plugin = open_plugin_memo.get_plugin(plugin_name)
+            elif root_url:
+                plugin = open_plugin_memo.init_openplugin(root_url=root_url)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
 
         # Ensure the plugin was initialized successfully and has a manifest
         if not plugin or not hasattr(plugin, 'manifest'):

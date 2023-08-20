@@ -115,14 +115,18 @@ def plugin():
         open_plugin_memo.init()
     # get the body
     data = request.get_json()
-    if not open_plugin_memo.plugins_directory[data["openplugin_namespace"]]:
-        # invalid input error
+    
+    if not data.get("openplugin_namespace") and not data.get("openplugin_root_url"):
+        return jsonify({"error": "Invalid openplugin namespace or root url"}), 400
+    if data.get("openplugin_namespace") and not open_plugin_memo.plugins_directory[data["openplugin_namespace"]]:
         return jsonify({"error": "Invalid openplugin namespace"}), 
     if not data["messages"] or len(data["messages"]) == 0:
-        # invalid input error
         return jsonify({"error": "No messages"}), 400
     
-    plugin = open_plugin_memo.get_plugin(data["openplugin_namespace"])
+    if data.get("openplugin_namespace"):
+        plugin = open_plugin_memo.get_plugin(data["openplugin_namespace"])
+    elif data.get("openplugin_root_url"):
+        plugin = open_plugin_memo.init_openplugin(root_url=data["openplugin_root_url"])
     if not plugin:
         try:
             plugin = open_plugin_memo.init_plugin(data["openplugin_namespace"])

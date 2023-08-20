@@ -185,16 +185,21 @@ def evaluate_tentative():
         # Extract the relevant openplugin_info values from the manifest
         openplugin_info = {
             "namespace": manifest.get("name_for_model"),
+            "image": manifest.get("logo_url"),
             "description_for_human": manifest.get("description_for_human"),
             "description_for_model": manifest.get("description_for_model"),
             "domain": plugin.root_url,
+            "openapi_url": manifest.get("api", {}).get("url"),
             "auth": manifest.get("auth"),
             "blacklisted": False,
             "whitelisted": True,
+            "stimulous_prompt": None,  # This will be populated later
+            "stimulated": False,
+            "status": "tentative"
         }
 
         # Ensure all required values are present in the openplugin_info
-        required_keys = ["namespace", "description_for_human", "description_for_model", "domain", "auth"]
+        required_keys = ["namespace", "description_for_human", "description_for_model", "domain", "auth", "image", "openapi_url"]
         for key in required_keys:
             if not openplugin_info.get(key):
                 return jsonify({"error": f"Missing value for {key} in the manifest."}), 400

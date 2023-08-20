@@ -8,6 +8,7 @@ from collections import deque
 from typing import Dict, List, TypedDict
 from openplugincore import openplugin_completion, OpenPluginMemo
 from datetime import datetime
+from urllib.parse import unquote
 
 
 load_dotenv()
@@ -156,6 +157,8 @@ def evaluate_tentative():
         # Retrieve the plugin_name or root_url from the request parameters
         plugin_name = request.args.get('plugin_name')
         root_url = request.args.get('root_url')
+        if root_url:
+            root_url = unquote(root_url)
 
         # Ensure that either plugin_name or root_url is provided
         if not plugin_name and not root_url:

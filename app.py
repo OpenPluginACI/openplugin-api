@@ -9,6 +9,7 @@ from typing import Dict, List, TypedDict
 from openplugincore import openplugin_completion, OpenPluginMemo
 from datetime import datetime
 from urllib.parse import unquote
+from openai import ChatCompletion
 
 
 load_dotenv()
@@ -199,6 +200,88 @@ def evaluate_tentative():
                 return jsonify({"error": f"Missing value for {key} in the manifest."}), 400
 
         return jsonify(openplugin_info), 200
+
+    except Exception as e:
+        error_class = type(e).__name__
+        error_message = str(e)
+        return jsonify({"error": f"{error_class} error: {error_message}"}), 500
+    
+@app.route('/generate_prompt', methods=['GET'])
+def generate_prompt():
+    authorization = request.headers.get('authorization')
+    if authorization != os.getenv('AUTHORIZATION_SECRET'):
+        return jsonify({"error": "Unauthorized"}), 401 
+    
+    try:
+        # Retrieve the plugin_name or root_url from the request parameters
+        plugin_name = request.args.get('plugin_name')
+        root_url = request.args.get('root_url')
+        if root_url:
+            root_url = unquote(root_url)
+
+        # Ensure that either plugin_name or root_url is provided
+        if not plugin_name and not root_url:
+            return jsonify({"error": "Either plugin_name or root_url must be provided"}), 400
+
+        # Initialize the plugin
+        plugin = None
+        if plugin_name:
+            plugin = open_plugin_memo.get_plugin(plugin_name)
+        elif root_url:
+            plugin = open_plugin_memo.init_openplugin(root_url=root_url)
+
+        # Ensure the plugin was initialized successfully and has a manifest
+        if not plugin or not hasattr(plugin, 'manifest'):
+            return jsonify({"error": "Failed to initialize the plugin or the plugin lacks a manifest."}), 400
+
+        # Generate the stimulous_prompt using the manifest descriptions
+        generate_stimulation_prompt_prompt = {
+            "prompt": f"""
+            Please create a prompt that will trigger an model's plugin with the human description delimited by driple backticks.
+            If necessary also look at the model description also delimited by triple backticks.
+            Please do not ask anything from the AI you should provide all the information it needs in the prompt.
+            You should not be ambiguous or open ended in your prompt use specific examples.
+            Do not simply restate the description.
+            Human description:
+            ```
+            {plugin.manifest["description_for_human"]}
+            ```
+            Model description:
+            ```
+            {plugin.manifest["description_for_model"]}
+            ```
+            """,
+            "function": {
+                "name": "stimulous_prompt_generation",
+                "description": """
+                Generates a natural language phrase to that triggers the AI plugin.
+                If appropriate the phrase should include an example item/url (https://github.com/)/text/etc. even if you are not sure if it is real its ok to make it up.
+                """,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "stimulous_prompt": {
+                            "type": "string",
+                            "description": "The stimulous phrase to trigger the AI plugin"
+                        },
+                    },
+                    "required": ["stimulous_prompt"]
+                }
+            }
+        }
+
+        generation = ChatCompletion.create(
+            model="gpt-3.5-turbo-0613",
+            temperature=0.7,
+            messages=[{"role": "user", "content": generate_stimulation_prompt_prompt["prompt"]}],
+            functions=[generate_stimulation_prompt_prompt["function"]],
+            function_call={"name": "stimulous_prompt_generation"}
+        )
+
+        json_arguments = json.loads(generation["choices"][0]["message"]["function_call"]["arguments"])
+        stimulous_prompt = json_arguments["stimulous_prompt"]
+
+        return jsonify({"stimulous_prompt": stimulous_prompt}), 200
 
     except Exception as e:
         error_class = type(e).__name__

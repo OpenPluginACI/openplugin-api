@@ -215,7 +215,10 @@ def evaluate_tentative():
 def evaluate_supported():
     authorization = request.headers.get('authorization')
     if authorization != os.getenv('AUTHORIZATION_SECRET'):
-        return jsonify({"error": "Unauthorized"}), 401
+        return jsonify({
+            "prompt": prompt,
+            "plugin_response": {"error": "Unauthorized"},
+        }), 401
     
     headers = {'authorization': authorization}
     
@@ -231,7 +234,10 @@ def evaluate_supported():
 
         # Ensure that either plugin_name or root_url is provided
         if not plugin_name and not root_url:
-            return jsonify({"error": "Either plugin_name or root_url must be provided"}), 400
+            return jsonify({
+                "prompt": prompt,
+                "plugin_response": {"error": "Either plugin_name or root_url must be provided"},
+            }), 400
 
         # If no prompt is provided, get one from the /generate_prompt endpoint
         if not prompt:

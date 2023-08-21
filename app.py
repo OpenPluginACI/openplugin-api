@@ -244,7 +244,10 @@ def evaluate_supported():
                     prompt = response.json.get('stimulous_prompt')
                     print("generated prompt: ", prompt)
                 else:
-                    return jsonify(response.json), response.status_code
+                    return jsonify({
+                        "prompt": prompt,
+                        "plugin_response": response.json,
+                    }), response.status_code
 
         # Transform the prompt into a message and send it to the /plugin endpoint
         data = {
@@ -257,12 +260,20 @@ def evaluate_supported():
 
         with app.test_client() as client:
             response = client.post('/plugin', json=data, headers=headers)
-            return jsonify(response.json), response.status_code
+            return jsonify({
+                "prompt": prompt,
+                "plugin_response": response.json,
+            }), response.status_code
 
     except Exception as e:
         error_class = type(e).__name__
         error_message = str(e)
-        return jsonify({"error": f"{error_class} error: {error_message}"}), 500
+        return jsonify({
+            "prompt": prompt,
+            "plugin_response": {
+                "error": f"{error_class} error: {error_message}"
+            }
+        }), 500
     
 @app.route('/generate_prompt', methods=['GET'])
 def generate_prompt():

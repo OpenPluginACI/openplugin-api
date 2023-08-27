@@ -141,6 +141,7 @@ def plugin():
             messages=data["messages"],
             truncate=True,
             model="gpt-3.5-turbo-0613",
+            plugin_headers=data.get("plugin_headers", None),
             temperature=0,
         )
     except Exception as e:

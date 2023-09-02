@@ -470,7 +470,7 @@ def oauth_token():
         # Make the POST request to the token_url
         token_response = requests.post(
             token_url,
-            headers=token_request_headers,
+            headers={**headers, **token_request_headers},
             data=token_data
         )
 

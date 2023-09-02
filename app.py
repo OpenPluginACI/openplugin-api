@@ -383,43 +383,59 @@ def generate_prompt():
 
 @app.route('/oauth_initialization', methods=['GET'])
 def oauth_initialization():
-    # Extract and decode parameters from the request
-    client_id = unquote(request.args.get('client_id', ''))
-    client_domain = unquote(request.args.get('client_domain', ''))
-    authorization_url = unquote(request.args.get('authorization_url', ''))
-    token_url = unquote(request.args.get('token_url', ''))
-    openplugin_callback_url = unquote(request.args.get('openplugin_callback_url', ''))
-    authorization_content_type = unquote(request.args.get('authorization_content_type', ''))
+    try:
+        # Extract and decode parameters from the request
+        client_domain = unquote(request.args.get('client_domain', ''))
+        authorization_url = unquote(request.args.get('authorization_url', ''))
+        token_url = unquote(request.args.get('token_url', ''))
+        openplugin_callback_url = unquote(request.args.get('openplugin_callback_url', ''))
+        authorization_content_type = unquote(request.args.get('authorization_content_type', ''))
 
-    # Generate a unique state value for this request
-    state = os.urandom(16).hex()
+        # Fetch the item from the 'openplugin-auth' collection using the client_domain
+        item = db["openplugin-auth"].find_one({"domain": client_domain})
+        if not item:
+            return jsonify({"error": "Item not found"}), 404
 
-    # Store these parameters in the session under the state key
-    session[state] = {
-        "client_id": client_id,
-        "client_domain": client_domain,
-        "authorization_url": authorization_url,
-        "token_url": token_url,
-        "openplugin_callback_url": openplugin_callback_url,
-        "authorization_content_type": authorization_content_type
-    }
+        # Retrieve the client_id from the item
+        client_id = item.get("oauth", {}).get("client_id")
+        if not client_id:
+            return jsonify({"error": "Client ID not found"}), 404
 
-    # Initialize the client with the provided client_id
-    client = WebApplicationClient(client_id)
+        # Generate a unique state value for this request
+        state = os.urandom(16).hex()
 
-    # Construct the redirect_url to point to the /oauth_token endpoint of the same Flask API
-    base_url = request.url_root.rstrip('/')
-    redirect_url = f"{base_url}/oauth_token"
+        # Store these parameters in the session under the state key
+        session[state] = {
+            "client_id": client_id,
+            "client_domain": client_domain,
+            "authorization_url": authorization_url,
+            "token_url": token_url,
+            "openplugin_callback_url": openplugin_callback_url,
+            "authorization_content_type": authorization_content_type
+        }
 
-    # Prepare the authorization request
-    authorization_url, headers, _ = client.prepare_authorization_request(
-        authorization_url=authorization_url,
-        state=state,
-        redirect_url=redirect_url
-    )
+        # Initialize the client with the retrieved client_id
+        client = WebApplicationClient(client_id)
 
-    # Redirect the user to the authorization_url
-    return redirect(authorization_url)
+        # Construct the redirect_url to point to the /oauth_token endpoint of the same Flask API
+        base_url = request.url_root.rstrip('/')
+        redirect_url = f"{base_url}/oauth_token"
+
+        # Prepare the authorization request
+        authorization_url, headers, _ = client.prepare_authorization_request(
+            authorization_url=authorization_url,
+            state=state,
+            redirect_url=redirect_url
+        )
+
+        # Redirect the user to the authorization_url
+        return redirect(authorization_url)
+
+    except Exception as e:
+        error_class = type(e).__name__
+        error_message = str(e)
+        return jsonify({"error": f"{error_class} error: {error_message}"}), 500
+
 
 @app.route('/oauth_token', methods=['GET'])
 def oauth_token():

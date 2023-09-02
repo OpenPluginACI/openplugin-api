@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session, redirect
 from dotenv import load_dotenv
 from flask_cors import CORS
 import os
@@ -11,6 +11,8 @@ from datetime import datetime
 from urllib.parse import quote, unquote
 from openai import ChatCompletion
 from pymongo import MongoClient
+from oauthlib.oauth2 import WebApplicationClient
+from urllib.parse import unquote
 
 
 load_dotenv()
@@ -18,6 +20,7 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PORT = int(os.getenv('PORT'))
 MONGODB_URI = os.getenv('MONGODB_URI')
+SESSION_SECRET = os.getenv('SESSION_SECRET')
 
 # Setup MongoDB connection
 client = MongoClient(MONGODB_URI, tlsAllowInvalidCertificates=True)
@@ -27,6 +30,7 @@ open_plugin_memo = OpenPluginMemo()
 open_plugin_memo.init()
 
 app = Flask(__name__)
+app.secret_key = SESSION_SECRET
 CORS(app)
 
 class BucketItem(TypedDict):
@@ -393,6 +397,49 @@ def generate_prompt():
         error_class = type(e).__name__
         error_message = str(e)
         return jsonify({"error": f"{error_class} error: {error_message}"}), 500
+    
+
+
+@app.route('/oauth_initialization', methods=['GET'])
+def oauth_initialization():
+    # Extract and decode parameters from the request
+    client_id = unquote(request.args.get('client_id', ''))
+    client_domain = unquote(request.args.get('client_domain', ''))
+    authorization_url = unquote(request.args.get('authorization_url', ''))
+    token_url = unquote(request.args.get('token_url', ''))
+    openplugin_callback_url = unquote(request.args.get('openplugin_callback_url', ''))
+    authorization_content_type = unquote(request.args.get('authorization_content_type', ''))
+
+    # Generate a unique state value for this request
+    state = os.urandom(16).hex()
+
+    # Store these parameters in the session under the state key
+    session[state] = {
+        "client_id": client_id,
+        "client_domain": client_domain,
+        "authorization_url": authorization_url,
+        "token_url": token_url,
+        "openplugin_callback_url": openplugin_callback_url,
+        "authorization_content_type": authorization_content_type
+    }
+
+    # Initialize the client with the provided client_id
+    client = WebApplicationClient(client_id)
+
+    # Construct the redirect_url to point to the /oauth_token endpoint of the same Flask API
+    base_url = request.url_root.rstrip('/')
+    redirect_url = f"{base_url}/oauth_token"
+
+    # Prepare the authorization request
+    authorization_url, headers, _ = client.prepare_authorization_request(
+        authorization_url=authorization_url,
+        state=state,
+        redirect_url=redirect_url
+    )
+
+    # Redirect the user to the authorization_url
+    return redirect(authorization_url)
+
 
 @app.route('/admin', methods=['GET'])
 def admin_view():

@@ -10,12 +10,18 @@ from openplugincore import openplugin_completion, OpenPluginMemo
 from datetime import datetime
 from urllib.parse import quote, unquote
 from openai import ChatCompletion
+from pymongo import MongoClient
 
 
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PORT = int(os.getenv('PORT'))
+MONGODB_URI = os.getenv('MONGODB_URI')
+
+# Setup MongoDB connection
+client = MongoClient(MONGODB_URI, tlsAllowInvalidCertificates=True)
+db = client["openplugin-io"]
 
 open_plugin_memo = OpenPluginMemo()
 open_plugin_memo.init()
@@ -64,6 +70,26 @@ def rate_limiter_pass(early_access_token: str, plugin_name: str) -> bool:
         return True
 
     return False
+
+@app.route('/test', methods=['GET'])
+def test():
+    try:
+        # Fetch the item from the 'openplugin-auth' collection with the specified domain
+        item = db["openplugin-auth"].find_one({"domain": "https://bffd-174-64-129-70.ngrok-free.app"})
+        
+        # If the item is not found, return a not found response
+        if not item:
+            return jsonify({"error": "Item not found"}), 404
+        
+        # Convert the ObjectId to string before returning the item
+        item["_id"] = str(item["_id"])
+        
+        return jsonify(item)
+    
+    except Exception as e:
+        error_class = type(e).__name__
+        error_message = str(e)
+        return jsonify({"error": f"{error_class} error: {error_message}"}), 500
 
 
 @app.route('/chat_completion', methods=['POST'])

@@ -485,6 +485,9 @@ def oauth_token():
         }
         redirect_url = f"{session_data['openplugin_callback_url']}?{urlencode(params)}"
 
+        # cleanup session
+        del session[state]
+
         return redirect(redirect_url)
 
     except Exception as e:

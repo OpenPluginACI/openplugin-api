@@ -388,6 +388,7 @@ def oauth_initialization():
         client_domain = unquote(request.args.get('client_domain', ''))
         authorization_url = unquote(request.args.get('authorization_url', ''))
         token_url = unquote(request.args.get('token_url', ''))
+        scope = unquote(request.args.get('scope', ''))
         openplugin_callback_url = unquote(request.args.get('openplugin_callback_url', ''))
         authorization_content_type = unquote(request.args.get('authorization_content_type', ''))
 
@@ -410,6 +411,7 @@ def oauth_initialization():
             "client_domain": client_domain,
             "authorization_url": authorization_url,
             "token_url": token_url,
+            "scope": scope,
             "openplugin_callback_url": openplugin_callback_url,
             "authorization_content_type": authorization_content_type
         }
@@ -425,7 +427,8 @@ def oauth_initialization():
         authorization_url, headers, _ = client.prepare_authorization_request(
             authorization_url=authorization_url,
             state=state,
-            redirect_url=redirect_url
+            redirect_url=redirect_url,
+            scope=scope
         )
 
         # Redirect the user to the authorization_url
@@ -491,7 +494,7 @@ def oauth_token():
         )
 
         # Parse the response data
-        client.parse_request_body_response(json.dumps(token_response.json()))
+        client.parse_request_body_response(json.dumps(token_response.json()), scope=session_data["scope"])
 
         # Construct the redirect URL with the response data and other parameters
         params = {

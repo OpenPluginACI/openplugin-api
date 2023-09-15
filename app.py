@@ -140,6 +140,10 @@ def plugin():
         plugin = open_plugin_memo.get_plugin(data["openplugin_namespace"])
     elif data.get("openplugin_root_url"):
         plugin = open_plugin_memo.init_openplugin(root_url=data["openplugin_root_url"])
+
+    model = data.get("model", "gpt-3.5-turbo-0613")
+    openai_api_key = data.get("openai_api_key", OPENAI_API_KEY)
+
     if not plugin:
         try:
             plugin = open_plugin_memo.init_plugin(data["openplugin_namespace"])
@@ -151,8 +155,9 @@ def plugin():
         plugin_response = plugin.fetch_plugin(
             messages=data["messages"],
             truncate=True,
-            model="gpt-3.5-turbo-0613",
             plugin_headers=data.get("plugin_headers", None),
+            model=model,
+            openai_api_key=openai_api_key,
             temperature=0,
         )
     except Exception as e:

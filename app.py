@@ -156,6 +156,7 @@ def plugin():
             messages=data["messages"],
             truncate=True,
             plugin_headers=data.get("plugin_headers", None),
+            return_assistant_message=True,
             model=model,
             openai_api_key=openai_api_key,
             temperature=0,
@@ -283,9 +284,13 @@ def evaluate_supported():
 
         with app.test_client() as client:
             response = client.post('/plugin', json=data, headers=headers)
+            # get the response json and then extract the attribute function_message from it
+            response_to_return = response.json
+            if response_to_return.get('function_message', {}):
+                response_to_return = response_to_return.get('function_message', {})
             return jsonify({
                 "prompt": prompt,
-                "plugin_response": response.json,
+                "plugin_response": response_to_return,
             }), response.status_code
 
     except Exception as e:

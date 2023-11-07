@@ -141,7 +141,7 @@ def plugin():
     elif data.get("openplugin_root_url"):
         plugin = open_plugin_memo.init_openplugin(root_url=data["openplugin_root_url"])
 
-    model = data.get("model", "gpt-3.5-turbo-0613")
+    model = data.get("model", "gpt-3.5-turbo-1106")
     openai_api_key = data.get("openai_api_key", OPENAI_API_KEY)
 
     if not plugin:
